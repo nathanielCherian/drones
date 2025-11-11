@@ -1,5 +1,7 @@
 # tensorboard
 hover/ppo_tensorboard
+hover/models
+hover/*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

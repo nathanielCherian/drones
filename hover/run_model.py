@@ -1,0 +1,61 @@
+import cv2
+import time
+import numpy as np
+import torch as th
+import pandas as pd
+
+from gym_pybullet_drones.utils.enums import DroneModel, Physics
+from gym_pybullet_drones.envs.HoverAviary import HoverAviary
+from gym_pybullet_drones.utils.enums import ObservationType, ActionType
+from gym_pybullet_drones.utils.Logger import Logger
+from gym_pybullet_drones.utils.utils import sync
+import pybullet as p
+
+from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.logger import Video
+from stable_baselines3 import PPO
+
+from TunedHoverAviary import TunedHoverAviary
+
+DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
+DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+
+INIT_XYZS = np.array([[0, 0, 0]])
+INIT_RPYS = np.array([[0, 0, 0]])
+
+def run():
+
+    env = TunedHoverAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    print('[INFO] Action space:', env.action_space)
+    print('[INFO] Observation space:', env.observation_space)
+
+
+    model = PPO.load("models/ppo_hover_model_4d_150k_more.zip")
+
+    obs, info = env.reset()
+    done = False
+    i = 0
+    START = time.time()
+    logs = []
+    while not done:
+        action, _states = model.predict(obs, deterministic=True)
+        obs, reward, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        if truncated:
+            print("TRUNCATED!")
+        sync(i, START, env.CTRL_TIMESTEP)
+        i += 1
+
+        logs.append(list(obs[0][:3]) + [reward, terminated, truncated])
+
+    df = pd.DataFrame(logs, columns=["x", "y", "z", "reward", "terminated", "truncated"])
+    df.to_csv("log.csv", index=False)
+
+    # logger.plot()
+
+
+if __name__ == "__main__":
+    run()

@@ -13,6 +13,8 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
 
+from TunedHoverAviary import TunedHoverAviary
+
 CAM_LOOKAT_POS = [0,0,0.5]
 CAM_POS = [1,1,1.5]
 
@@ -119,15 +121,15 @@ class CustomEvalCallback(BaseCallback):
 # We will use the 1D-RPM to control the hover
 # Observation type will be limited to Kinematic information (no RGB)
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
-DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 
 
 INIT_XYZS = np.array([[0, 0, 0]])
 INIT_RPYS = np.array([[0, 0, 0]])
 
 
-def run():
-    train_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+def run(from_model=None):
+    train_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     print('[INFO] Action space:', train_env.action_space)
     print('[INFO] Observation space:', train_env.observation_space)
@@ -135,13 +137,21 @@ def run():
     PYB_CLIENT = train_env.getPyBulletClient()
 
     sb3_env = DummyVecEnv([lambda: Monitor(train_env)])
-    model = PPO("MlpPolicy", sb3_env, verbose=1, 
-        tensorboard_log="./ppo_tensorboard/", )
+    
+    model = None
+    if from_model:
+        model = PPO.load(from_model, env=sb3_env, verbose=1,
+            tensorboard_log="./ppo_tensorboard/")
+    else:
+        model = PPO("MlpPolicy", sb3_env, verbose=1, 
+            tensorboard_log="./ppo_tensorboard/", )
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=110000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=150000, callback=eval_callback, tb_log_name="PPO")
+    print("saving model.")
+    model.save("models/ppo_hover_model_4d_150k_2xboosted")
     return
 
 if __name__ == "__main__":
-    run()
+    run(from_model="models/ppo_hover_model_4d_150k.zip")
