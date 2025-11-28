@@ -5,10 +5,15 @@ class TunedHoverAviary(HoverAviary):
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
-        self.EPISODE_LEN_SEC = 30
+        self.TARGET_POS = np.array([0, 0, 1])
+        self.EPISODE_LEN_SEC = 8
+        self.TARGET_QUAT = np.array([0, 0, 0, 1])  # xyzw
 
     def _computeReward(self):
         """Computes the current reward value.
+
+        Combines penalties for distance and angle difference with bonuses for
+        reaching the target position.
 
         Returns
         -------
@@ -17,12 +22,39 @@ class TunedHoverAviary(HoverAviary):
 
         """
         state = self._getDroneStateVector(0)
-        # ret = -np.linalg.norm(self.TARGET_POS-state[0:3])**8
-        norm = np.linalg.norm(self.TARGET_POS-state[0:3])
-        ret = max(0, 4 - (norm)**1)
-        if np.linalg.norm(self.TARGET_POS-state[0:3]) < .4:
-            ret *= 2
-        return ret
+        
+        # Calculate position error
+        pos_error = self.TARGET_POS - state[0:3]
+        vel_error = np.linalg.norm(state[10:13])
+        distance = np.linalg.norm(pos_error)
+
+        
+        # Base reward: penalize distance and angle difference
+        distance_penalty = distance ** 2  # Quadratic penalty for distance
+        vel_penalty = vel_error ** 2       # Quadratic penalty for velocity
+
+        #compute distance from hover for rpy stabilization
+        rpy_error = state[9:12]
+        rpy_penalty = np.linalg.norm(rpy_error) ** 2
+        
+        base_reward = -1.0 * distance_penalty - 1.0 * vel_penalty - 0.5 * rpy_penalty
+
+        if self._computeTruncated():
+            base_reward -= 10.0  # Large penalty for truncation (crash or out of bounds)
+        else:
+            base_reward += 0.001  # Small reward for surviving each step
+        
+        # # Bonus for being close to target position
+        # if distance < 0.2:
+        #     base_reward += 5.0  # Strong bonus when very close
+        # elif distance < 0.4:
+        #     base_reward += 2.0  # Moderate bonus when close
+        
+        # # Bonus for good orientation alignment
+        # if angle_diff < 0.3:  # ~17 degrees
+        #     base_reward += 1.0
+        
+        return float(base_reward)
 
     ################################################################################
     

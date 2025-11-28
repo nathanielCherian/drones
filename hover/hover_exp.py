@@ -1,12 +1,14 @@
 import cv2
 import numpy as np
 import torch as th
+import moviepy.editor as mp
 
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
 import pybullet as p
 
+from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
@@ -15,7 +17,7 @@ from stable_baselines3 import PPO
 
 from TunedHoverAviary import TunedHoverAviary
 
-CAM_LOOKAT_POS = [0,0,0.5]
+CAM_LOOKAT_POS = [0,1,0.5]
 CAM_POS = [1,1,1.5]
 
 def get_frame(cid, target_pos, cam_pos):
@@ -124,7 +126,7 @@ DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 
 
-INIT_XYZS = np.array([[0, 0, 0]])
+INIT_XYZS = np.array([[0, 0, 1]])
 INIT_RPYS = np.array([[0, 0, 0]])
 
 
@@ -140,15 +142,19 @@ def run(from_model=None):
     
     model = None
     if from_model:
-        model = PPO.load(from_model, env=sb3_env, verbose=1,
-            tensorboard_log="./ppo_tensorboard/")
+        try:
+            model = PPO.load(from_model, env=sb3_env, verbose=1,
+                tensorboard_log="./ppo_tensorboard/")
+        except Exception as e:
+            model = PPO("MlpPolicy", sb3_env, verbose=1, 
+                tensorboard_log="./ppo_tensorboard/")
     else:
         model = PPO("MlpPolicy", sb3_env, verbose=1, 
-            tensorboard_log="./ppo_tensorboard/", )
+            tensorboard_log="./ppo_tensorboard/")
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=150000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=100000, callback=eval_callback, tb_log_name="PPO", )
     print("saving model.")
     model.save("models/ppo_hover_model_4d_150k_2xboosted")
     return
