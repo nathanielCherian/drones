@@ -15,7 +15,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
 
-from TunedHoverAviary import TunedHoverAviary
+from TrackingAviary import TrackingAviary
 
 CAM_LOOKAT_POS = [0,1,0.5]
 CAM_POS = [1,1,1.5]
@@ -84,6 +84,13 @@ class CustomEvalCallback(BaseCallback):
                 obs, reward, terminated, truncated, info = self.eval_env.step(action)
                 done = terminated or truncated
                 ep_reward += reward
+                
+                # Log current target position each step to TensorBoard (if available)
+                if self.logger and hasattr(self.eval_env, 'TARGET_POS'):
+                    tp = self.eval_env.TARGET_POS
+                    self.logger.record(f"{self.log_name}/target_x", float(tp[0]))
+                    self.logger.record(f"{self.log_name}/target_y", float(tp[1]))
+                    self.logger.record(f"{self.log_name}/target_z", float(tp[2]))
 
                 # Capture frame for TensorBoard
                 if self.logger:
@@ -131,7 +138,15 @@ INIT_RPYS = np.array([[0, 0, 0]])
 
 
 def run(from_model=None):
-    train_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    # Create tracking environment with 7 target changes, 1.0m distance between targets
+    train_env = TrackingAviary(
+        num_target_changes=7,
+        target_change_distance=1.0,
+        obs=DEFAULT_OBS,
+        act=DEFAULT_ACT,
+        initial_xyzs=INIT_XYZS,
+        initial_rpys=INIT_RPYS
+    )
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     print('[INFO] Action space:', train_env.action_space)
     print('[INFO] Observation space:', train_env.observation_space)
@@ -144,20 +159,20 @@ def run(from_model=None):
     if from_model:
         try:
             model = PPO.load(from_model, env=sb3_env, verbose=1,
-                tensorboard_log="./ppo_tensorboard/")
+                tensorboard_log="./ppo_tensorboard/", device="cpu")
         except Exception as e:
             model = PPO("MlpPolicy", sb3_env, verbose=1, 
-                tensorboard_log="./ppo_tensorboard/")
+                tensorboard_log="./ppo_tensorboard/", device="cpu")
     else:
         model = PPO("MlpPolicy", sb3_env, verbose=1, 
-            tensorboard_log="./ppo_tensorboard/")
+            tensorboard_log="./ppo_tensorboard/", device="cpu")
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=350000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=100000, callback=eval_callback, tb_log_name="PPO")
     print("saving model.")
-    model.save("models/ppo_hover_model_4d_600k_updated")
+    model.save("models/ppo_track_model_4d_150k_updated")
     return
 
 if __name__ == "__main__":
-    run(from_model="models/ppo_hover_model_4d_150k_more.zip")
+    run(from_model=None)
