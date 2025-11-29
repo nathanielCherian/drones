@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import torch as th
-
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
@@ -148,10 +147,10 @@ def run(from_model=None):
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=150000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=350000, callback=eval_callback, tb_log_name="PPO")
     print("saving model.")
-    model.save("models/ppo_hover_model_4d_150k_2xboosted")
+    model.save("models/ppo_hover_model_4d_600k_updated")
     return
 
 if __name__ == "__main__":
-    run(from_model="models/ppo_hover_model_4d_150k.zip")
+    run(from_model="models/ppo_hover_model_4d_150k_more.zip")

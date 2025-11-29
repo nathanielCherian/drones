@@ -22,7 +22,7 @@ from TunedHoverAviary import TunedHoverAviary
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 
-INIT_XYZS = np.array([[0, 0, 0]])
+INIT_XYZS = np.array([[0, 0, 1]])
 INIT_RPYS = np.array([[0, 0, 0]])
 
 def run():
@@ -33,7 +33,7 @@ def run():
     print('[INFO] Observation space:', env.observation_space)
 
 
-    model = PPO.load("models/ppo_hover_model_4d_150k_more.zip")
+    model = PPO.load("models/ppo_hover_model_4d_150k_2xboosted.zip")
 
     obs, info = env.reset()
     done = False
