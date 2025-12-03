@@ -145,19 +145,22 @@ def run(from_model=None):
         try:
             model = PPO.load(from_model, env=sb3_env, verbose=1,
                 tensorboard_log="./ppo_tensorboard/")
+            print("loaded model")
         except Exception as e:
+            print("new model")
             model = PPO("MlpPolicy", sb3_env, verbose=1, 
                 tensorboard_log="./ppo_tensorboard/")
     else:
+        print("new model")
         model = PPO("MlpPolicy", sb3_env, verbose=1, 
             tensorboard_log="./ppo_tensorboard/")
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=350000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=20000, callback=eval_callback, tb_log_name="PPO")
     print("saving model.")
     model.save("models/ppo_hover_model_4d_600k_updated")
     return
 
 if __name__ == "__main__":
-    run(from_model="models/ppo_hover_model_4d_150k_more.zip")
+    run(from_model="models/ppo_hover_model_4d_600k_updated.zip")
