@@ -1,22 +1,38 @@
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
 import numpy as np
 
-class TunedHoverAviary(HoverAviary):
+class TuneTrackingAviary(HoverAviary):
+    """Tracking environment where target changes after reaching each waypoint."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
-        self.EPISODE_LEN_SEC = 10
-        #self.TARGET_POS = np.array([0, 0, 1])
+        self.EPISODE_LEN_SEC = 20  # Longer episode for multiple targets
         
-        x = np.random.uniform(-1, 1)
-        y = np.random.uniform(-1, 1)
-        z = np.random.uniform(0, 1)
-        # Keep TARGET_POS as a 1D array [x, y, z] to match usage elsewhere
+        # Initialize with a fixed starting target (will change on reach)
         self.TARGET_POS = np.array([0, 0, 1])
         self.TARGET_RPY = np.array([0, 0, 0])
+        
         # Store initial xyzs and rpys ranges for randomization on reset
         self._randomize_init_pos = True
         self._randomize_target_pos = True
+        
+        # Generate a sequence of waypoints for tracking
+        self.waypoints = self._generate_waypoints()
+        self.current_waypoint_idx = 0
+        self.TARGET_POS = self.waypoints[self.current_waypoint_idx]
+        
+        # Distance threshold to consider target "reached"
+        self.target_reached_threshold = 0.5
+
+    def _generate_waypoints(self, num_waypoints=5):
+        """Generate a sequence of random waypoints for the drone to visit."""
+        waypoints = []
+        for _ in range(num_waypoints):
+            x = np.random.uniform(-1, 1)
+            y = np.random.uniform(-1, 1)
+            z = np.random.uniform(0.3, 1.5)  # Keep z between 0.3 and 1.5
+            waypoints.append(np.array([x, y, z]))
+        return waypoints
 
     def reset(self, **kwargs):
         """Reset the environment and randomize initial position if enabled."""
@@ -31,13 +47,13 @@ class TunedHoverAviary(HoverAviary):
         else:
             self.INIT_RPYS = np.array([[0, 0, 0]])
             self.INIT_XYZS = np.array([[0, 0, 1]])
-        if self._randomize_target_pos:
-            x = np.random.uniform(-1, 1)
-            y = np.random.uniform(-1, 1)
-            z = np.random.uniform(0, 1)
-            # Keep TARGET_POS as a 1D array [x, y, z] to match usage elsewhere
-            self.TARGET_POS = np.array([x, y, z])
-        print("target pos", self.TARGET_POS)
+        
+        # Reset waypoint tracking
+        self.waypoints = self._generate_waypoints()
+        self.current_waypoint_idx = 0
+        self.TARGET_POS = self.waypoints[self.current_waypoint_idx]
+        
+        print(f"Reset: Initial target waypoint {self.current_waypoint_idx}: {self.TARGET_POS}")
         # Call parent reset with any kwargs (e.g., seed)
         return super().reset(**kwargs)
 
@@ -45,7 +61,7 @@ class TunedHoverAviary(HoverAviary):
         """Computes the current reward value.
 
         Combines penalties for distance and angle difference with bonuses for
-        reaching the target position.
+        reaching waypoints and moving through the sequence.
 
         Returns
         -------
@@ -59,7 +75,7 @@ class TunedHoverAviary(HoverAviary):
         vel = state[10:13]
         pos = state[0:3]
 
-        # Distance to target
+        # Distance to current target
         norm = np.linalg.norm(self.TARGET_POS - pos)
 
         # Base distance reward (linear with distance)
@@ -87,9 +103,23 @@ class TunedHoverAviary(HoverAviary):
         near_vel_bonus = 0.0
         if norm < 0.2:
             near_vel_bonus = max(0.0, 1.0 - speed) * 2.0
+        #print(norm)
+        # Bonus for completing waypoints (progressing through sequence)
+        waypoint_bonus = 0.0
+        if norm < self.target_reached_threshold:
+            # Waypoint reached! Change to next one.
+            if self.current_waypoint_idx < len(self.waypoints) - 1:
+                self.current_waypoint_idx += 1
+                self.TARGET_POS = self.waypoints[self.current_waypoint_idx]
+                waypoint_bonus = 5.0  # Large bonus for reaching waypoint
+                print(f"Waypoint {self.current_waypoint_idx - 1} reached! Moving to waypoint {self.current_waypoint_idx}: {self.TARGET_POS}")
+            else:
+                # All waypoints completed
+                waypoint_bonus = 10.0
+                print(f"All waypoints completed!")
 
         # Combine terms
-        ret = distance_reward + vel_towards_reward + close_bonus + near_vel_bonus - speed_penalty
+        ret = distance_reward + vel_towards_reward + close_bonus + near_vel_bonus + waypoint_bonus - speed_penalty
 
         return float(ret)
 
@@ -119,12 +149,6 @@ class TunedHoverAviary(HoverAviary):
 
         """
         return False
-        # state = self._getDroneStateVector(0)
-        # if np.linalg.norm(self.TARGET_POS-state[0:3]) < .0001:
-        #     return True
-        # else:
-        #     return False
-
 
     def _computeTruncated(self):
         """Computes the current truncated value.

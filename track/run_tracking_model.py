@@ -17,7 +17,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
 
-from TunedHoverAviary import TunedHoverAviary
+from TuneTrackingAviary import TuneTrackingAviary
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
@@ -27,7 +27,7 @@ INIT_RPYS = np.array([[0, 0, 0]])
 
 def run():
 
-    env = TunedHoverAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    env = TuneTrackingAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     print('[INFO] Action space:', env.action_space)
     print('[INFO] Observation space:', env.observation_space)
@@ -53,22 +53,10 @@ def run():
         sync(i, START, env.CTRL_TIMESTEP)
         i += 1
 
-        # Get actual drone position and compute difference from target
-        state = env._getDroneStateVector(0)
-        actual_pos = env.unwrapped._getDroneStateVector(0)[0:3]  # Get original position
-        target_pos = env.TARGET_POS
-        diff = actual_pos - target_pos
-        
-        # Print every 100 steps
-        if i % 10 == 0:
-            print(f"Step {i} | Pos: ({actual_pos[0]:.2f}, {actual_pos[1]:.2f}, {actual_pos[2]:.2f}) | "
-                  f"Target: ({target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f}) | "
-                  f"Diff (dx, dy, dz): ({diff[0]:.2f}, {diff[1]:.2f}, {diff[2]:.2f})")
+        logs.append(list(obs[0][:3]) + [reward, terminated, truncated, env.current_waypoint_idx])
 
-        logs.append(list(obs[0][:3]) + [reward, terminated, truncated] + list(diff))
-
-    df = pd.DataFrame(logs, columns=["x", "y", "z", "reward", "terminated", "truncated", "dx", "dy", "dz"])
-    df.to_csv("log.csv", index=False)
+    df = pd.DataFrame(logs, columns=["x", "y", "z", "reward", "terminated", "truncated", "waypoint_idx"])
+    df.to_csv("tracking_log.csv", index=False)
     logs.clear()  # Free memory after saving
 
 
