@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import torch as th
+import os
+import imageio
 
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
@@ -114,6 +116,16 @@ class CustomEvalCallback(BaseCallback):
                 exclude=("stdout", "log", "json", "csv"),
             )
             print("logged video")
+
+        # Save video to disk as .mp4 so you can watch it directly
+        if len(frames) > 0:
+            os.makedirs("eval_videos", exist_ok=True)
+            video_path = f"eval_videos/eval_step_{self.num_timesteps}.mp4"
+            # frames are CHW (channels, height, width) -> convert to HWC for imageio
+            video_frames = [np.transpose(f, (1, 2, 0))[:, :, :3].astype(np.uint8) for f in frames]
+            imageio.mimsave(video_path, video_frames, fps=40)
+            print(f"saved video to {video_path}")
+
         return mean_reward, std_reward
 
 
@@ -154,4 +166,4 @@ def run(from_model=None):
     return
 
 if __name__ == "__main__":
-    run(from_model="models/ppo_hover_model_4d_150k.zip")
+    run()
