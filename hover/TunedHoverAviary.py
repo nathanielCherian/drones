@@ -37,7 +37,7 @@ class TunedHoverAviary(HoverAviary):
             z = np.random.uniform(0, 1)
             # Keep TARGET_POS as a 1D array [x, y, z] to match usage elsewhere
             self.TARGET_POS = np.array([x, y, z])
-        print("target pos", self.TARGET_POS)
+        #print("target pos", self.TARGET_POS)
         # Call parent reset with any kwargs (e.g., seed)
         return super().reset(**kwargs)
 
@@ -66,13 +66,24 @@ class TunedHoverAviary(HoverAviary):
         distance_reward = max(0.0, 4.0 - norm)
 
         # Vertical offset relative to target (positive means above target)
+        # Offsets relative to target (positive means drone is greater than target coordinate)
+        dx = pos[0] - self.TARGET_POS[0]
+        dy = pos[1] - self.TARGET_POS[1]
         dz = pos[2] - self.TARGET_POS[2]
 
-        # Reward motion toward the target altitude (non-quadratic):
-        # term = -k * dz * vz  => positive when velocity is directed toward target
+        # Reward motion toward the target along each axis (non-quadratic):
+        # term_axis = -k_axis * d_axis * v_axis => positive when velocity reduces the error
+        vx = float(vel[0])
+        vy = float(vel[1])
         vz = float(vel[2])
-        vel_towards_reward = -2.0 * dz * vz
-        vel_towards_reward = float(np.clip(vel_towards_reward, -3.0, 3.0))
+
+        kx, ky, kz = 1.5, 1.5, 2.0
+        vx_term = -kx * dx * vx
+        vy_term = -ky * dy * vy
+        vz_term = -kz * dz * vz
+
+        # Combine and clip to avoid large spikes
+        vel_towards_reward = float(np.clip(vx_term + vy_term + vz_term, -4.0, 4.0))
 
         # Penalize overall speed to encourage smooth hovering
         speed = float(np.linalg.norm(vel))

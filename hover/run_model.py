@@ -33,7 +33,7 @@ def run():
     print('[INFO] Observation space:', env.observation_space)
 
 
-    model = PPO.load("models/ppo_target_001.zip")
+    model = PPO.load("models/ppo_hover_model_4d_600k_updated.zip")
 
     obs, info = env.reset()
     done = False
