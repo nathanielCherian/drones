@@ -10,7 +10,7 @@ import pybullet as p
 
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
@@ -131,14 +131,25 @@ INIT_RPYS = np.array([[0, 0, 0]])
 
 
 def run(from_model=None):
-    train_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
-    # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
-    print('[INFO] Action space:', train_env.action_space)
-    print('[INFO] Observation space:', train_env.observation_space)
+    # Number of parallel environments (tune to CPU cores)
+    N_ENVS = 4
 
-    PYB_CLIENT = train_env.getPyBulletClient()
+    # Factory to create environments for SubprocVecEnv
+    def make_env(rank):
+        def _init():
+            env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+            return Monitor(env)
+        return _init
 
-    sb3_env = DummyVecEnv([lambda: Monitor(train_env)])
+    # Create vectorized training envs
+    sb3_env = SubprocVecEnv([make_env(i) for i in range(N_ENVS)])
+
+    # Single env used for logging / evaluation / GUI interactions
+    eval_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    print('[INFO] Action space:', eval_env.action_space)
+    print('[INFO] Observation space:', eval_env.observation_space)
+
+    PYB_CLIENT = eval_env.getPyBulletClient()
     
     model = None
     if from_model:
