@@ -18,6 +18,7 @@ from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
 
 from TuneTrackingAviary import TuneTrackingAviary
+from TrackingAviary import TrackingAviary
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
@@ -27,7 +28,7 @@ INIT_RPYS = np.array([[0, 0, 0]])
 
 def run():
 
-    env = TuneTrackingAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    env = TrackingAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     print('[INFO] Action space:', env.action_space)
     print('[INFO] Observation space:', env.observation_space)
@@ -53,9 +54,23 @@ def run():
         sync(i, START, env.CTRL_TIMESTEP)
         i += 1
 
-        logs.append(list(obs[0][:3]) + [reward, terminated, truncated, env.current_waypoint_idx])
+        # Get absolute world position from parent class
+        world_state = HoverAviary._getDroneStateVector(env, 0)
+        world_pos = world_state[0:3]
+        obs_pos = obs[0][:3]  # Shifted observation
+        target_pos = env.TARGET_POS
+        dist_to_target = np.linalg.norm(target_pos - world_pos)
+        
+        # Print every 10 steps
+        if i % 10 == 0:
+            print(f"Step {i:5d} | ObsPos: [{obs_pos[0]:6.3f}, {obs_pos[1]:6.3f}, {obs_pos[2]:6.3f}] | "
+                  f"WorldPos: [{world_pos[0]:6.3f}, {world_pos[1]:6.3f}, {world_pos[2]:6.3f}] | "
+                  f"Target: [{target_pos[0]:6.3f}, {target_pos[1]:6.3f}, {target_pos[2]:6.3f}] | "
+                  f"Distance: {dist_to_target:6.3f} | Reward: {reward:7.3f}")
 
-    df = pd.DataFrame(logs, columns=["x", "y", "z", "reward", "terminated", "truncated", "waypoint_idx"])
+        logs.append(list(obs_pos) + list(world_pos) + list(target_pos) + [dist_to_target, reward, terminated, truncated, env.target_changes_completed])
+
+    df = pd.DataFrame(logs, columns=["obs_x", "obs_y", "obs_z", "world_x", "world_y", "world_z", "target_x", "target_y", "target_z", "distance", "reward", "terminated", "truncated", "target_changes"])
     df.to_csv("tracking_log.csv", index=False)
     logs.clear()  # Free memory after saving
 

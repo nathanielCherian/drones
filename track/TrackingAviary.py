@@ -52,7 +52,9 @@ class TrackingAviary(HoverAviary):
 
     def _computeReward(self):
         """Computes the current reward value for tracking task."""
-        state = self._getDroneStateVector(0)
+        # Use the parent class to get the unshifted (world) state so
+        # distance calculations compare world coordinates with TARGET_POS.
+        state = super()._getDroneStateVector(0)
         vel = state[10:13]
         pos = state[0:3]
 
@@ -92,7 +94,8 @@ class TrackingAviary(HoverAviary):
 
     def _updateTarget(self):
         """Update target position if drone has reached current target."""
-        state = self._getDroneStateVector(0)
+        # Use absolute world state for checking distance to the world-space TARGET_POS
+        state = super()._getDroneStateVector(0)
         pos = state[0:3]
         
         # Check if drone reached current target
@@ -122,6 +125,22 @@ class TrackingAviary(HoverAviary):
                     self._create_target_marker()
                 except Exception:
                     pass
+
+    def _getDroneStateVector(self, drone_id: int):
+        """Return drone state vector with positions relative to target.
+        
+        Shifts position so the target appears at [0, 0, 1].
+        This makes the observation invariant to absolute position, helping
+        generalization to new target locations.
+        """
+        state = super()._getDroneStateVector(drone_id).copy()
+        
+        # Position is at indices 0:3
+        # Shift position so target is at [0, 0, 1] in the drone's frame
+        target_offset = self.TARGET_POS - np.array([0, 0, 1])
+        state[0:3] = state[0:3] - target_offset
+        
+        return state
 
     def step(self, action):
         """Step the environment and update target."""
@@ -172,7 +191,8 @@ class TrackingAviary(HoverAviary):
 
     def _computeTruncated(self):
         """Computes the current truncated value."""
-        state = self._getDroneStateVector(0)
+        # Use the parent (world) state for safety/truncation checks
+        state = super()._getDroneStateVector(0)
         
         # Truncate if drone goes out of bounds
         if (abs(state[0]) > 5 or abs(state[1]) > 5 or state[2] > 5 or state[2] < 0

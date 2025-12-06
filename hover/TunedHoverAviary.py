@@ -128,8 +128,8 @@ class TunedHoverAviary(HoverAviary):
             near_vel_bonus = max(0.0, 1.0 - speed) * 2.0
 
         # Combine terms
-        ret = distance_reward + vel_towards_reward
-        #ret = distance_reward + vel_towards_reward + close_bonus + near_vel_bonus - speed_penalty
+        #ret = distance_reward + vel_towards_reward
+        ret = distance_reward + vel_towards_reward + close_bonus + near_vel_bonus - speed_penalty
 
         return float(ret)
 

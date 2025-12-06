@@ -55,15 +55,23 @@ def run():
 
         # Get actual drone position and compute difference from target
         state = env._getDroneStateVector(0)
-        actual_pos = env.unwrapped._getDroneStateVector(0)[0:3]  # Get original position
+        # Get the true world position (unshifted). TunedHoverAviary overrides
+        # `_getDroneStateVector` to return positions shifted relative to the target
+        # for observations; call the parent class implementation to obtain the
+        # absolute world-frame position.
+        actual_pos = HoverAviary._getDroneStateVector(env, 0)[0:3]
         target_pos = env.TARGET_POS
         diff = actual_pos - target_pos
         
-        # Print every 100 steps
+        # Print every 10 steps: observation (shifted), actual world position, and target
+        observed_pos = obs[0][:3]  # observation vector is shifted so target appears at [0,0,1]
         if i % 10 == 0:
-            print(f"Step {i} | Pos: ({actual_pos[0]:.2f}, {actual_pos[1]:.2f}, {actual_pos[2]:.2f}) | "
-                  f"Target: ({target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f}) | "
-                  f"Diff (dx, dy, dz): ({diff[0]:.2f}, {diff[1]:.2f}, {diff[2]:.2f})")
+            print(
+                f"Step {i} | ObsPos: ({observed_pos[0]:.2f}, {observed_pos[1]:.2f}, {observed_pos[2]:.2f}) | "
+                f"WorldPos: ({actual_pos[0]:.2f}, {actual_pos[1]:.2f}, {actual_pos[2]:.2f}) | "
+                f"Target: ({target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f}) | "
+                f"Diff (dx, dy, dz): ({diff[0]:.2f}, {diff[1]:.2f}, {diff[2]:.2f})"
+            )
 
         logs.append(list(obs[0][:3]) + [reward, terminated, truncated] + list(diff))
 
