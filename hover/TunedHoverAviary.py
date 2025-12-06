@@ -176,7 +176,7 @@ class TunedHoverAviary(HoverAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if (abs(state[0]) > 2 or abs(state[1]) > 2 or state[2] > 5 # Truncate when the drone is too far away
+        if (abs(state[0]) > 4 or abs(state[1]) > 4 or state[2] > 10 # Truncate when the drone is too far away
              or abs(state[7]) > .4 or abs(state[8]) > .4 # Truncate when the drone is too tilted
         ):
             return True

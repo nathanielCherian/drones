@@ -22,7 +22,7 @@ class TuneTrackingAviary(HoverAviary):
         self.TARGET_POS = self.waypoints[self.current_waypoint_idx]
         
         # Distance threshold to consider target "reached"
-        self.target_reached_threshold = 0.5
+        self.target_reached_threshold = 0.2
 
     def _generate_waypoints(self, num_waypoints=5):
         """Generate a sequence of random waypoints for the drone to visit."""
@@ -119,7 +119,7 @@ class TuneTrackingAviary(HoverAviary):
                 print(f"All waypoints completed!")
 
         # Combine terms
-        ret = distance_reward + vel_towards_reward + close_bonus + near_vel_bonus + waypoint_bonus - speed_penalty
+        ret = distance_reward + vel_towards_reward + waypoint_bonus
 
         return float(ret)
 
@@ -160,7 +160,7 @@ class TuneTrackingAviary(HoverAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if (abs(state[0]) > 2 or abs(state[1]) > 2 or state[2] > 5 # Truncate when the drone is too far away
+        if (abs(state[0]) > 4 or abs(state[1]) > 4 or state[2] > 10 # Truncate when the drone is too far away
              or abs(state[7]) > .4 or abs(state[8]) > .4 # Truncate when the drone is too tilted
         ):
             return True

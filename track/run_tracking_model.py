@@ -34,7 +34,7 @@ def run():
     print('[INFO] Observation space:', env.observation_space)
 
 
-    model = PPO.load("models/ppo_target_001.zip")
+    model = PPO.load("models/ppo_hover_model_4d_3m_updated.zip")
 
     obs, info = env.reset()
     done = False
@@ -71,7 +71,7 @@ def run():
         logs.append(list(obs_pos) + list(world_pos) + list(target_pos) + [dist_to_target, reward, terminated, truncated, env.target_changes_completed])
 
     df = pd.DataFrame(logs, columns=["obs_x", "obs_y", "obs_z", "world_x", "world_y", "world_z", "target_x", "target_y", "target_z", "distance", "reward", "terminated", "truncated", "target_changes"])
-    df.to_csv("tracking_log.csv", index=False)
+    #df.to_csv("tracking_log.csv", index=False)
     logs.clear()  # Free memory after saving
 
 

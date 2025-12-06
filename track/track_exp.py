@@ -169,7 +169,7 @@ def run(from_model=None):
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=100000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=500000, callback=eval_callback, tb_log_name="PPO")
     print("saving model.")
     model.save("models/ppo_track_model_4d_150k_updated")
     return
