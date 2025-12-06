@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import torch as th
+from datetime import datetime
 
 from gym_pybullet_drones.utils.enums import DroneModel, Physics
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
@@ -8,7 +9,7 @@ from gym_pybullet_drones.utils.enums import ObservationType, ActionType
 import pybullet as p
 
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
@@ -35,16 +36,19 @@ def get_frame(cid, target_pos, cam_pos):
     )
 
     w, h = 720, 720
+    # Configure TinyRenderer for this client (needed for headless rendering)
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1, physicsClientId=cid)
+    p.configureDebugVisualizer(p.COV_ENABLE_GUI, 0, physicsClientId=cid)
+    
     _, _, rgb, depth, seg = p.getCameraImage(
         width=w,
         height=h,
         viewMatrix=view,
         projectionMatrix=proj,
         physicsClientId=cid,
-        renderer=p.ER_BULLET_HARDWARE_OPENGL, # or leave default
     )
 
-    img = np.reshape(rgb, (h, w, 4))  # BGRA
+    img = np.reshape(rgb, (h, w, 4))  # RGBA
     # bgr = img[...,:3]  
     # cv2.imwrite("frame.png", bgr)
     return img
@@ -128,15 +132,22 @@ INIT_XYZS = np.array([[0, 0, 0]])
 INIT_RPYS = np.array([[0, 0, 0]])
 
 
-def run(from_model=None):
-    train_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
-    # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
-    print('[INFO] Action space:', train_env.action_space)
-    print('[INFO] Observation space:', train_env.observation_space)
+def run(from_model=None, n_envs=8):
+    # Helper to create env instances for parallel training
+    def make_env(rank):
+        def _init():
+            env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+            return Monitor(env)
+        return _init
 
-    PYB_CLIENT = train_env.getPyBulletClient()
+    # Separate eval env
+    eval_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    print('[INFO] Action space:', eval_env.action_space)
+    print('[INFO] Observation space:', eval_env.observation_space)
+    print(f'[INFO] Using {n_envs} parallel environments!')
 
-    sb3_env = DummyVecEnv([lambda: Monitor(train_env)])
+    # Create parallel training environments
+    sb3_env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
     
     model = None
     if from_model:
@@ -146,12 +157,16 @@ def run(from_model=None):
         model = PPO("MlpPolicy", sb3_env, verbose=1, 
             tensorboard_log="./ppo_tensorboard/", )
 
-    eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
+    eval_callback = CustomEvalCallback(eval_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=150000, callback=eval_callback, tb_log_name="PPO")
+    model.learn(total_timesteps=250000, callback=eval_callback, tb_log_name="PPO")
     print("saving model.")
-    model.save("models/ppo_hover_model_4d_150k_2xboosted")
+    timestamp = datetime.now().strftime("%m.%d.%Y_%H.%M.%S")
+    model.save(f"models/ppo_hover_model_4d_150k_2xboosted_{timestamp}")
+    
+    sb3_env.close()
+    eval_env.close()
     return
 
 if __name__ == "__main__":
-    run(from_model="models/ppo_hover_model_4d_150k.zip")
+    run()
