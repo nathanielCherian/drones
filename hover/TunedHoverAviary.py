@@ -5,7 +5,7 @@ class TunedHoverAviary(HoverAviary):
 
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
-        self.EPISODE_LEN_SEC = 30
+        self.EPISODE_LEN_SEC = 15
 
     def _computeReward(self):
         """Computes the current reward value.
@@ -19,9 +19,9 @@ class TunedHoverAviary(HoverAviary):
         state = self._getDroneStateVector(0)
         # ret = -np.linalg.norm(self.TARGET_POS-state[0:3])**8
         norm = np.linalg.norm(self.TARGET_POS-state[0:3])
-        ret = max(0, 4 - (norm)**1)
-        if np.linalg.norm(self.TARGET_POS-state[0:3]) < .4:
-            ret *= 2
+        ret = max(0, 4 - (norm)**2)
+        # if np.linalg.norm(self.TARGET_POS-state[0:3]) < .4:
+        #     ret *= 2
         return ret
 
     ################################################################################

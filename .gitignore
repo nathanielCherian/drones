@@ -1,5 +1,7 @@
 # tensorboard
 hover/ppo_tensorboard
+hover/final_logs
+hover/final_models
 hover/models
 hover/*.csv
 

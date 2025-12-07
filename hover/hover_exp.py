@@ -10,8 +10,12 @@ import pybullet as p
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.logger import Video
+from stable_baselines3.common.logger import Video, Image
 from stable_baselines3 import PPO
+
+import matplotlib.pyplot as plt
+from io import BytesIO
+from PIL import Image as PILImage
 
 from TunedHoverAviary import TunedHoverAviary
 
@@ -49,6 +53,18 @@ def get_frame(cid, target_pos, cam_pos):
     # cv2.imwrite("frame.png", bgr)
     return img
 
+def fig_to_image(fig):
+    buf = BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    buf.seek(0)
+
+    pil_img = PILImage.open(buf).convert("RGB")
+    img_array = np.array(pil_img)
+
+    buf.close()
+    plt.close(fig)
+    return img_array
+
 class CustomEvalCallback(BaseCallback):
     """
     Evaluates the agent periodically and logs mean reward, std, and optionally frames to TensorBoard.
@@ -77,31 +93,37 @@ class CustomEvalCallback(BaseCallback):
             done = False
             ep_reward = 0
             frames = []
+            values = []
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
                 obs, reward, terminated, truncated, info = self.eval_env.step(action)
                 done = terminated or truncated
                 ep_reward += reward
 
+                state = self.eval_env._getDroneStateVector(0)
+
                 # Capture frame for TensorBoard
                 if self.logger:
-                    frame = get_frame(cid, CAM_LOOKAT_POS, CAM_POS)
-                    # frame = np.random.randint(0, 256, size=(500, 500, 3), dtype=np.uint8)
-                    frame = np.transpose(frame, (2,0,1))  # HWC -> CHW
-                    frames.append(frame)
-                    # try:
-                    #     # frame = self.eval_env.render(mode="rgb_array")
-                    #     frame = np.random.randint(0, 256, size=(500, 500, 3), dtype=np.uint8)
-                    #     frame = np.transpose(frame, (2,0,1))  # HWC -> CHW
-                    #     self.logger.get_writer().add_image(f"{self.log_name}/frame_episode{ep}", frame, self.num_timesteps)
-                    # except Exception as e:
-                    #     if self.verbose > 0:
-                    #         print(f"Could not render frame: {e}")
+                    if len(frames) < self.eval_env.PYB_FREQ*8:
+                        frame = get_frame(cid, CAM_LOOKAT_POS, CAM_POS)
+                        # frame = np.random.randint(0, 256, size=(500, 500, 3), dtype=np.uint8)
+                        frame = np.transpose(frame, (2,0,1))  # HWC -> CHW
+                        frames.append(frame)
+
+                    TARGET_POS = np.array([0,0,1])
+                    norm = np.linalg.norm(TARGET_POS-state[0:3])
+                    values.append(norm)
 
             rewards.append(ep_reward)
         
         mean_reward = np.mean(rewards)
         std_reward = np.std(rewards)
+
+        fig, ax = plt.subplots()
+        ax.plot([i/self.eval_env.PYB_FREQ for i in range(len(values))], values)
+        ax.set_title("Euclidian Distance")
+        ax.set_xlabel("Time")
+        ax.set_ylabel("Value")
 
         # Log scalar metrics
         if self.logger:
@@ -114,6 +136,16 @@ class CustomEvalCallback(BaseCallback):
                 exclude=("stdout", "log", "json", "csv"),
             )
             print("logged video")
+
+
+            img = fig_to_image(fig)
+            self.logger.record(
+                f"trajectory/euclidian",
+                Image(img, dataformats='HWC'),
+                exclude=("stdout", "log", "json", "csv"),
+            )
+            print("logged euclidian distance")
+
         return mean_reward, std_reward
 
 
@@ -127,8 +159,7 @@ DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one
 INIT_XYZS = np.array([[0, 0, 0]])
 INIT_RPYS = np.array([[0, 0, 0]])
 
-
-def run(from_model=None):
+def run(from_model=None, save_model=None):
     train_env = TunedHoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     print('[INFO] Action space:', train_env.action_space)
@@ -141,17 +172,25 @@ def run(from_model=None):
     model = None
     if from_model:
         model = PPO.load(from_model, env=sb3_env, verbose=1,
-            tensorboard_log="./ppo_tensorboard/")
+            tensorboard_log="./final_logs/")
     else:
         model = PPO("MlpPolicy", sb3_env, verbose=1, 
-            tensorboard_log="./ppo_tensorboard/", )
+            tensorboard_log="./final_logs/", )
 
     eval_callback = CustomEvalCallback(train_env, eval_freq=10000, n_eval_episodes=1)
 
-    model.learn(total_timesteps=150000, callback=eval_callback, tb_log_name="PPO")
-    print("saving model.")
-    model.save("models/ppo_hover_model_4d_150k_2xboosted")
-    return
+    model.learn(total_timesteps=200000, callback=eval_callback, tb_log_name=save_model)
+    if save_model:
+        print("saving model.")
+        model.save(save_model)
+
+
+"""
+My record of runs
+1. Reward function max(0, 4 - (norm)**1), length=15 seconds, epochs=200k
+2. Reward function max(0, 4 - (norm)**2), length=15 seconds, epochs=200k
+"""
+
 
 if __name__ == "__main__":
-    run(from_model="models/ppo_hover_model_4d_150k.zip")
+    run(save_model="PPO_200k_15s_r2")
