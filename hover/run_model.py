@@ -18,6 +18,7 @@ from stable_baselines3.common.logger import Video
 from stable_baselines3 import PPO
 
 from TunedHoverAviary import TunedHoverAviary
+from NoisyHoverAviary import NoisyHoverAviary
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
@@ -27,8 +28,11 @@ INIT_RPYS = np.array([[0, 0, 0]])
 
 def run(model=""):
 
-    env = TunedHoverAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    env = NoisyHoverAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS, noise=0.50)
+    # env = TunedHoverAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
+    
     print('[INFO] Action space:', env.action_space)
     print('[INFO] Observation space:', env.observation_space)
 
