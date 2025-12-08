@@ -1,5 +1,6 @@
 from gym_pybullet_drones.envs.HoverAviary import HoverAviary
 import numpy as np
+import math
 
 class TunedHoverAviary(HoverAviary):
 
@@ -17,11 +18,16 @@ class TunedHoverAviary(HoverAviary):
 
         """
         state = self._getDroneStateVector(0)
+        pos_err = self.TARGET_POS-state[0:3]
+        # pos_err[2] *= 5
+        euc_norm = np.linalg.norm(pos_err)
+        k = 2
+        ret = 10 * math.exp(-1 * k * (euc_norm**2))
         # ret = -np.linalg.norm(self.TARGET_POS-state[0:3])**8
-        norm = np.linalg.norm(self.TARGET_POS-state[0:3])
-        ret = max(0, 4 - (norm)**2)
-        # if np.linalg.norm(self.TARGET_POS-state[0:3]) < .4:
-        #     ret *= 2
+        # norm = np.linalg.norm(self.TARGET_POS-state[0:3])
+        # ret = max(0, 4 - (norm)**4)
+        # if np.linalg.norm(self.TARGET_POS-state[0:3]) < .5:
+        #     ret += 2
         return ret
 
     ################################################################################
@@ -53,7 +59,7 @@ class TunedHoverAviary(HoverAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if (abs(state[0]) > 1.5 or abs(state[1]) > 1.5 or state[2] > 4 # Truncate when the drone is too far away
+        if (abs(state[0]) > 1.5 or abs(state[1]) > 1.5 or state[2] > 1.5 # Truncate when the drone is too far away
              or abs(state[7]) > .4 or abs(state[8]) > .4 # Truncate when the drone is too tilted
         ):
             return True

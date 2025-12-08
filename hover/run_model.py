@@ -25,7 +25,7 @@ DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one
 INIT_XYZS = np.array([[0, 0, 0]])
 INIT_RPYS = np.array([[0, 0, 0]])
 
-def run():
+def run(model=""):
 
     env = TunedHoverAviary(gui=True, obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
     # eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, initial_xyzs=INIT_XYZS, initial_rpys=INIT_RPYS)
@@ -33,7 +33,7 @@ def run():
     print('[INFO] Observation space:', env.observation_space)
 
 
-    model = PPO.load("models/ppo_hover_model_4d_150k_more.zip")
+    model = PPO.load(model)
 
     obs, info = env.reset()
     done = False
@@ -58,4 +58,4 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    run(model="final_models/PPO_200k_15s_r2")

@@ -104,11 +104,11 @@ class CustomEvalCallback(BaseCallback):
 
                 # Capture frame for TensorBoard
                 if self.logger:
-                    if len(frames) < self.eval_env.PYB_FREQ*8:
-                        frame = get_frame(cid, CAM_LOOKAT_POS, CAM_POS)
-                        # frame = np.random.randint(0, 256, size=(500, 500, 3), dtype=np.uint8)
-                        frame = np.transpose(frame, (2,0,1))  # HWC -> CHW
-                        frames.append(frame)
+                    # if len(frames) < self.eval_env.PYB_FREQ*2:
+                    #     frame = get_frame(cid, CAM_LOOKAT_POS, CAM_POS)
+                    #     # frame = np.random.randint(0, 256, size=(500, 500, 3), dtype=np.uint8)
+                    #     frame = np.transpose(frame, (2,0,1))  # HWC -> CHW
+                    #     frames.append(frame)
 
                     TARGET_POS = np.array([0,0,1])
                     norm = np.linalg.norm(TARGET_POS-state[0:3])
@@ -130,11 +130,11 @@ class CustomEvalCallback(BaseCallback):
             self.logger.record(f"{self.log_name}/mean_reward", mean_reward)
             self.logger.record(f"{self.log_name}/std_reward", std_reward)
             self.logger.dump(self.num_timesteps)
-            self.logger.record(
-                "trajectory/video",
-                Video(th.from_numpy(np.asarray([frames])), fps=40),
-                exclude=("stdout", "log", "json", "csv"),
-            )
+            # self.logger.record(
+            #     "trajectory/video",
+            #     Video(th.from_numpy(np.asarray([frames])), fps=40),
+            #     exclude=("stdout", "log", "json", "csv"),
+            # )
             print("logged video")
 
 
@@ -187,10 +187,34 @@ def run(from_model=None, save_model=None):
 
 """
 My record of runs
+# Changing the exponent
 1. Reward function max(0, 4 - (norm)**1), length=15 seconds, epochs=200k
 2. Reward function max(0, 4 - (norm)**2), length=15 seconds, epochs=200k
+3. Reward function max(0, 4 - (norm)**3), length=15 seconds, epochs=200k
+
+# Adding extra boost
+4. Reward function max(0, 4 - (norm)**2) (0.5 radius + 2), length=15 seconds, epochs=200k
+
+# Gaussian reward function
+5. Reward function gaussian, p=2, k=1 length=15 seconds, epochs=200k
+
+6. Reward function gaussian, p=2, k=2 length=15 seconds, epochs=200k
+    - y error is doubled
+
+7. Reward function gaussian, p=2, k=2 length=15 seconds, epochs=200k
+    - Low ceiling
+
+next up...
+7. Reward function gaussian, p=1, k=1 length=15 seconds, epochs=200k
+8. Reward function gaussian, p=2, k=0.5 length=15 seconds, epochs=200k
+9. Reward function gaussian, p=2, k=2 length=15 seconds, epochs=200k
+
+
+10. Reward function gaussian, p=2, k=1, jitter + rotation penalties length=15 seconds, epochs=200k
+    - Jitter penalty = norm of velocity
+    - rotation penality = norm of rotation velocity
 """
 
 
 if __name__ == "__main__":
-    run(save_model="PPO_200k_15s_r2")
+    run(save_model="PPO_200k_15s_r7")
